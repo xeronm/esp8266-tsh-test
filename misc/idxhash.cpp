@@ -4,7 +4,7 @@ extern "C" {
 	#include "misc/idxhash.h"
 }
 
-class IdxHash_zskey : public ::testing::Test {
+class IdxHashNullTermKey : public ::testing::Test {
 protected:
 	void SetUp()
 	{
@@ -18,8 +18,22 @@ protected:
 	char	buf[1024];
 };
 
+class IdxHashFixedKey : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+		ih_errcode_t res = ih_init8(buf, 1024, 16, sizeof(void*), 2, &hndlr);
+	}
+	void TearDown()
+	{
+	}
 
-TEST_F(IdxHash_zskey, TestAdd)
+	ih_hndlr_t hndlr;
+	char	buf[1024];
+};
+
+
+TEST_F(IdxHashNullTermKey, TestAdd)
 {
 	uint16* value = 0;
 	ASSERT_EQ(ih_hash8_add(hndlr, "x", 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 1;
@@ -44,14 +58,14 @@ TEST_F(IdxHash_zskey, TestAdd)
 	ASSERT_EQ(ih_hash8_add(hndlr, "y", 0, (char**)&value, 0), IH_ENTRY_EXISTS); *value = 19;
 }
 
-TEST_F(IdxHash_zskey, TestSearch)
+TEST_F(IdxHashNullTermKey, TestSearch)
 {
 	uint16* value = 0;
 	ASSERT_EQ(ih_hash8_add(hndlr, "x", 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 1;
 	ASSERT_EQ(ih_hash8_add(hndlr, "first_date", 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 2;
 	ASSERT_EQ(ih_hash8_add(hndlr, "d", 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 3;
 	ASSERT_EQ(ih_hash8_add(hndlr, "i", 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 4;
-
+ 
 	ASSERT_EQ(ih_hash8_search(hndlr, "x", 0, (char**)&value), IH_ERR_SUCCESS);
 	ASSERT_EQ(*value, 1);
 	ASSERT_EQ(ih_hash8_search(hndlr, "first_date", 0, (char**)&value), IH_ERR_SUCCESS);
@@ -60,6 +74,28 @@ TEST_F(IdxHash_zskey, TestSearch)
 	ASSERT_EQ(*value, 3);
 	ASSERT_EQ(ih_hash8_search(hndlr, "i", 0, (char**)&value), IH_ERR_SUCCESS);
 	ASSERT_EQ(*value, 4);
-
+ 
 	ASSERT_EQ(ih_hash8_search(hndlr, "last_date", 0, (char**)&value), IH_ENTRY_NOTFOUND);
+}
+
+
+
+TEST_F(IdxHashFixedKey, TestSearch)
+{
+	uint16* value = 0;
+        void* key = (void*) 0xFFFF;
+	ASSERT_EQ(ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 1; 
+	key = (void*) 0xFF1F;
+	ASSERT_EQ(ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 2; 
+	key = (void*) 0xFF2F;
+	ASSERT_EQ(ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 3; 
+	key = (void*) 0xFF3F;
+	ASSERT_EQ(ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 4;
+
+        key = (void*) 0xFF1F;
+	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
+	ASSERT_EQ(*value, 2);
+        key = (void*) 0xFF3F;
+	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
+	ASSERT_EQ(*value, 4);
 }

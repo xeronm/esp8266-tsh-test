@@ -7,21 +7,23 @@ extern "C" {
 }
 
 #define BUFFER_LENGTH		2048
-#define LSH_PRINT_DUMP
+//#define LSH_PRINT_DUMP
 
-void check_dump(sh_hndlr_t hstmt, char* buf, uint16 crc) {
+void check_dump(sh_hndlr_t hstmt, char* buf, uint16 crc_expect) {
 	ASSERT_EQ(
 		stmt_dump(hstmt, buf, BUFFER_LENGTH, true), SH_ERR_SUCCESS);
 	size_t len = strlen(buf);
-	uint16 crcd = crc16((unsigned char*)buf, len);
+	uint16 crc_dump = crc16((unsigned char*)buf, len);
 
+	if (crc_expect) {
 #ifdef LSH_PRINT_DUMP
-	sh_stmt_info_t info;
-	stmt_info(hstmt, &info);
-	printf("bytecode dump (slen:%u, crc:%u, dlen:%u):\n%s\n", info.length, crcd, len, buf);
+            if (crc_expect != crc_dump) {
+		sh_stmt_info_t info;
+		stmt_info(hstmt, &info);
+		printf("bytecode dump (dlen:%u, crc:%u, bclen:%u):\n%s\n", info.length, crc_dump, len, buf);
+            }
 #endif
-	if (crc) {
-		ASSERT_EQ(crcd, crc);
+	    ASSERT_EQ(crc_dump, crc_expect);
 	}
 
 	stmt_free(hstmt);
@@ -58,7 +60,8 @@ protected:
 		imdb_class_def_t	cdef = { "data", false, true, false, 10, 1, 4, 4, 8 };
 		imdb_class_create(hmdb, &cdef, &hdata);
 
-		lsh_on_start(hmdb, hdata, NULL);
+                svcres = { hmdb, 0, hdata };
+		lsh_on_start((const svcs_resource_t *) &svcres, NULL);
 	}
 	void TearDown()
 	{
@@ -67,6 +70,7 @@ protected:
 		imdb_done(hmdb);
 	}
 
+        svcs_resource_t svcres;
 	char			buf[BUFFER_LENGTH];
 	sh_hndlr_t		hstmt;
 	imdb_hndlr_t	hmdb;
@@ -76,8 +80,9 @@ protected:
 
 TEST_F(LshClassSimple, ServiceControl)
 {
+        svcs_resource_t svcres = { hmdb, 0, hdata };
 	ASSERT_EQ(
-		lsh_on_start(hmdb, hdata, NULL), SVCS_ERR_SUCCESS);
+		lsh_on_start((const svcs_resource_t *) &svcres, NULL), SVCS_ERR_SUCCESS);
 	ASSERT_EQ(
 		lsh_on_stop(), SVCS_ERR_SUCCESS);
 }
@@ -86,134 +91,157 @@ TEST_F(LshClass, AtomicOperations)
 {
 	ASSERT_EQ(
 		stmt_parse(" 2 + 5 ", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 28694);
+	check_dump(hstmt, buf, 5856);
 
 	ASSERT_EQ(
 		stmt_parse(" 2 * 5 ", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 17829);
+	check_dump(hstmt, buf, 9043);
 
 	ASSERT_EQ(
 		stmt_parse("!1", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 36277);
+	check_dump(hstmt, buf, 34390);
+}
 
+TEST_F(LshClass, FunctionCall)
+{
 	ASSERT_EQ(
 		stmt_parse("func1()", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 18015);
+	check_dump(hstmt, buf, 19900);
 
 	ASSERT_EQ(
 		stmt_parse("func2( 5 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 34014);
+	check_dump(hstmt, buf, 57896);
 
 	ASSERT_EQ(
 		stmt_parse("func3( 5, \"abc\", 10 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 26302);
+	check_dump(hstmt, buf, 24607);
+}
+
+
+TEST_F(LshClass, VariableDeclareAndAssignment)
+{
+	ASSERT_EQ(
+		stmt_parse("# var2; # var3; ## var0;", "", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 24164);
 
 	// Fixme: should optimized
 	ASSERT_EQ(
 		stmt_parse("# var1 := 10", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 8154);
-}
-
-TEST_F(LshClass, Variable)
-{
-	ASSERT_EQ(
-		stmt_parse("# var1 := 10; func1( var1 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 15147);
+	check_dump(hstmt, buf, 43893);
 
 	ASSERT_EQ(
-		stmt_parse("## var1 := 10; func1( var1 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 31971);
+		stmt_parse("## var2 := 5", "", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 62956);
 
 	ASSERT_EQ(
-		stmt_parse("## var1 := 5; func2( var1 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 38461);
-
-	ASSERT_EQ(
-		stmt_parse("# var2; # var3;", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 22193);
+		stmt_parse("#var1 := get_value();", "", &hstmt), SH_ERR_SUCCESS);
 
 	// Fixme: wrong result
 	ASSERT_EQ(
 		stmt_parse("var1 := get_value();", "", &hstmt), SH_CODE_VARIABLE_UNDEF);
 }
 
+TEST_F(LshClass, VariableUsage)
+{
+	ASSERT_EQ(
+		stmt_parse("# var1 := 10; func1( var1 )", "", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 54353);
+
+	ASSERT_EQ(
+		stmt_parse("## var1 := 10; func1( var1 )", "", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 53107);
+
+	ASSERT_EQ(
+		stmt_parse("## var1 := 5; func2( var1 )", "", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 7412);
+}
+
 TEST_F(LshClass, ControlsOperations)
 {
 	ASSERT_EQ(
 		stmt_parse("2*3;4+5", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 33579);
+	check_dump(hstmt, buf, 37019);
 
 	ASSERT_EQ(
 		stmt_parse("2+3 ? 4*5 ; 6-7", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 34002);
+	check_dump(hstmt, buf, 9222);
 
  	ASSERT_EQ(
 		stmt_parse("2+3 ? 4*5 : 6-7", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 30971);
+	check_dump(hstmt, buf, 61580);
 
 	ASSERT_EQ(
 		stmt_parse("(2 < 3) ?? { 4*5 } : { 6-7; }", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 11990);
+	check_dump(hstmt, buf, 47490);
+}
 
+TEST_F(LshClass, ConditionalResult)
+{
 	// Fixme: wrong results
 	ASSERT_EQ(
 		stmt_parse("call( 2+3 ? 4*5 : 6-7 )", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 0);
+	check_dump(hstmt, buf, 1);
 
 	ASSERT_EQ(
 		stmt_parse("# var1; var1 := (2=1) ? 1 : 0", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 0);
+	check_dump(hstmt, buf, 1);
 
 	ASSERT_EQ(
 		stmt_parse("# var1; (2=1) ? var1 := 1 : 0", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 0);
+	check_dump(hstmt, buf, 1);
 }
 
 TEST_F(LshClass, PriorityOperatons)
 {
 	ASSERT_EQ(
 		stmt_parse(" 2 * 5 * 3 ", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 22405);
+	check_dump(hstmt, buf, 23654);
 
 	ASSERT_EQ(
 		stmt_parse(" 2 + 5 + 3 ", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 12942);
+	check_dump(hstmt, buf, 14701);
 
 	ASSERT_EQ(
 		stmt_parse("2 + 5*3", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 37847);
+	check_dump(hstmt, buf, 59608);
 	ASSERT_EQ(
 		stmt_parse("2*5 + 3", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 6376);
+	check_dump(hstmt, buf, 25575);
 
 	ASSERT_EQ(
 		stmt_parse("!2 + 5*3 + 6*1", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 20917);
+	check_dump(hstmt, buf, 312);
 
  	ASSERT_EQ(
 		stmt_parse("2*5 + 3*6 + !1", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 32249);
+	check_dump(hstmt, buf, 18775);
 
 
 	ASSERT_EQ(
 		stmt_parse("2*(5 + 3*4)", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 12461);
+	check_dump(hstmt, buf, 25590);
 
 	ASSERT_EQ(
 		stmt_parse("(2*4 + 5)*3", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 58874);
+	check_dump(hstmt, buf, 63840);
 
 	ASSERT_EQ(
-		stmt_parse("2*((2*4 + 5) + 3) + 7", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 43033);
+		stmt_parse("2*((2*4 + 5) + 3) + 7", "", &hstmt), SH_ERR_SUCCESS); // Fixme: May optimized
+	check_dump(hstmt, buf, 53025);
 
 	ASSERT_EQ(
 		stmt_parse("( 2 + 3 ) * 5 + (7)", "", &hstmt), SH_ERR_SUCCESS);
-	check_dump(hstmt, buf, 19410);
+	check_dump(hstmt, buf, 22344);
 }
 
 TEST_F(LshClass, ComplexStatement)
 {
+	ASSERT_EQ(
+		stmt_parse(
+"## last_sdt; # sdt := sysdate(); print(last_sdt, sdt - last_sdt); (sdt % 2 = 0) ? print(0) : print(1); last_sdt := sdt;",
+			"", &hstmt), SH_ERR_SUCCESS);
+	check_dump(hstmt, buf, 58296);
+
 	ASSERT_EQ(
 		stmt_parse(
 "	## last_dt;"

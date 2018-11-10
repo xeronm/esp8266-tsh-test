@@ -25,8 +25,8 @@ OBJ_EXTRA = ./../googletest/googletest/make/gtest_main.a
 #    DISABLE_CORE -
 #    DISABLE_SYSTEM -
 #    LOGGING_DEBUG -
-#    LOGGIGN_DEBUG_MODE -
-DEFINES = 
+#    LOGGING_DEBUG_MODE -
+DEFINES = LOGGING_DEBUG ASSERT_DEBUG LOGGING_SEVERITY=LOG_ERROR
 
 LIBS = pthread
 
@@ -35,13 +35,24 @@ SRCDIRS = $(addprefix $(APP_SOURCE)/,$(SRCDIRS_APP)) $(SRCDIRS_APP)
 
 CFLAGS = $(addprefix -I,$(INCLUDES)) \
 	$(addprefix -I,$(INCLUDES_EXTRA)) \
-	$(addprefix -D,$(DEFINES))
+	$(addprefix -D,$(DEFINES)) \
+	-fno-strict-aliasing \
+	-fno-omit-frame-pointer \
+	-fexceptions \
+	-g2 -gdwarf-2 \
+	-std=gnu11
 
 # The pre-processor options used by the cpp (man cpp for more).
 CPPFLAGS  = $(addprefix -I,$(INCLUDES)) \
 	$(addprefix -I,$(INCLUDES_EXTRA)) \
 	$(addprefix -D,$(DEFINES)) \
-	-std=c++11 
+	-fno-strict-aliasing \
+	-fno-omit-frame-pointer \
+	-fthreadsafe-statics \
+	-fexceptions \
+	-frtti \
+	-g2 -gdwarf-2 \
+	-std=gnu++11
 
 LDLIBS =  $(addprefix -l,$(LIBS))
 LDFLAGS = $(addprefix -L,$(LIBDIR_EXTRA))
@@ -49,7 +60,7 @@ LDFLAGS = $(addprefix -L,$(LIBDIR_EXTRA))
 
 ## Implicit Section: change the following only when necessary.
 ##==========================================================================
-BUILD_DIR = .build/$(TEST_APP)/
+BUILD_DIR = .build/$(APP)/
 BINDIR = bin/
 
 # The source file types (headers excluded).
