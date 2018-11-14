@@ -22,7 +22,7 @@ class IdxHashFixedKey : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		ih_errcode_t res = ih_init8(buf, 1024, 16, sizeof(void*), 2, &hndlr);
+		ih_errcode_t res = ih_init8(buf, 640, 16, sizeof(void*), 2, &hndlr);
 	}
 	void TearDown()
 	{
@@ -78,9 +78,7 @@ TEST_F(IdxHashNullTermKey, TestSearch)
 	ASSERT_EQ(ih_hash8_search(hndlr, "last_date", 0, (char**)&value), IH_ENTRY_NOTFOUND);
 }
 
-
-
-TEST_F(IdxHashFixedKey, TestSearch)
+TEST_F(IdxHashFixedKey, TestAddSearchDel)
 {
 	uint16* value = 0;
         void* key = (void*) 0xFFFF;
@@ -98,4 +96,55 @@ TEST_F(IdxHashFixedKey, TestSearch)
         key = (void*) 0xFF3F;
 	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
 	ASSERT_EQ(*value, 4);
+
+        key = (void*) 0xFF4F;
+	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ENTRY_NOTFOUND);
+
+        key = (void*) 0xFF1F;
+	ASSERT_EQ(ih_hash8_remove(hndlr, (const char *) &key, 0), IH_ERR_SUCCESS);
+	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ENTRY_NOTFOUND);
+}
+
+TEST_F(IdxHashFixedKey, TestFullFillAndCompact)
+{
+	uint16* value = 0;
+        void* key = (void*) 0xFFFF;
+
+	int i = 0;
+        ih_errcode_t res;
+	while ((res = ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0)) != IH_BUFFER_OVERFLOW) {
+		ASSERT_EQ(res, IH_ERR_SUCCESS); 
+		*value = i + 1; 
+		key = (void*) ((char *) key + 1);
+		i++;
+	}
+	ASSERT_EQ(i, 24);
+
+	int j;
+	for (j = 0; j < 5; j++) {
+		key = (void*) ((char *)0xFFFF + j);
+		ASSERT_EQ(ih_hash8_remove(hndlr, (const char *) &key, 0), IH_ERR_SUCCESS);
+	}
+
+	for (j = 6; j < 16; j+=2) {
+		key = (void*) ((char *)0xFFFF + j);
+		ASSERT_EQ(ih_hash8_remove(hndlr, (const char *) &key, 0), IH_ERR_SUCCESS);
+	}
+
+	key = (void*) 0xFF1F;
+	ASSERT_EQ(ih_hash8_add(hndlr, (const char *) &key, 0, (char**)&value, 0), IH_ERR_SUCCESS); *value = 1000;
+
+        key = (void*) 0xFF1F;
+	ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
+
+	for (j = 5; j < 16; j+=2) {
+		key = (void*) ((char *)0xFFFF + j);
+		ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
+	}
+
+	for (j = 16; j < 24; j++) {
+		key = (void*) ((char *)0xFFFF + j);
+		ASSERT_EQ(ih_hash8_search(hndlr, (const char *) &key, 0, (char**)&value), IH_ERR_SUCCESS);
+	}
+
 }

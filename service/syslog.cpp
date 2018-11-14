@@ -12,8 +12,8 @@ protected:
 	void SetUp()
 	{
 		imdb_def_t db_def = { 1024, BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
-		imdb_class_def_t	cdef = { "data", false, true, false, 10, 1, 4, 4, 8 };
+		imdb_init(&db_def, &hmdb);
+		imdb_class_def_t	cdef = { "data", false, true, false, 10, 1, 4, 8 };
 		imdb_class_create(hmdb, &cdef, &hdata);
 
 		dtlv_ctx_init_encode(&dtlv_conf, conf, sizeof(conf));

@@ -12,15 +12,12 @@ extern "C" {
 #define ROWID_SIZE			4
 #define CURSOR_SIZE			40
 #else
-#define HEADER_CLASS_SIZE	152
-#define HEADER_PAGE_SIZE	64
+#define HEADER_CLASS_SIZE	144
+#define HEADER_PAGE_SIZE	56
 #define HEADER_BLOCK_SIZE	12
-#define ROWID_SIZE			8
-#define CURSOR_SIZE			48
+#define ROWID_SIZE		16
+#define CURSOR_SIZE		64
 #endif
-
-#define IMDB_INIT_BLOCKS	4
-#define IMDB_INIT_PAGES		1
 
 #define SLOT_TYPE2_SIZE		4
 #define SLOT_TYPE4_SIZE		8
@@ -31,10 +28,12 @@ protected:
 	{
 		block_size = 4096;
 		obj_size = 1024;
+		page_blocks = 6;
+		class_pages = 3;
 		
 		imdb_def_t db_def = { (block_size_t) (block_size - 1), BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
-		imdb_class_def_t	cdef = { "testobj", false, false, false, 25, 3, 0, 8, (obj_size_t) (obj_size - 1) };
+		imdb_init(&db_def, &hmdb);
+		imdb_class_def_t	cdef = { "testobj", false, false, false, 25, class_pages, page_blocks, (obj_size_t) (obj_size - 1) };
 		imdb_class_create(hmdb, &cdef, &hcls);
 	}
 	void TearDown()
@@ -45,6 +44,8 @@ protected:
 	imdb_hndlr_t	hmdb;
 	imdb_hndlr_t	hcls;
 	block_size_t	block_size;
+	uint8 		page_blocks;
+	uint8		class_pages;
 	obj_size_t	obj_size;
 };
 
@@ -56,8 +57,8 @@ protected:
 		obj_size = 1024;
 
 		imdb_def_t db_def = { (block_size_t) (block_size - 1), BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
-		imdb_class_def_t	cdef = { "testobj", true, false, false, 25, 1, 0, 8, (obj_size_t) (obj_size - 1) };
+		imdb_init(&db_def, &hmdb);
+		imdb_class_def_t	cdef = { "testobj", true, false, false, 25, 1, 4, (obj_size_t) (obj_size - 1) };
 		imdb_class_create(hmdb, &cdef, &hcls);
 	}
 	void TearDown()
@@ -79,8 +80,8 @@ protected:
 		obj_size_div = 64;
 
 		imdb_def_t db_def = { (block_size_t) (block_size - 1), BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
-		imdb_class_def_t	cdef = { "testobj", false, true, false, 25, 3, 0, 8, 0 };
+		imdb_init(&db_def, &hmdb);
+		imdb_class_def_t	cdef = { "testobj", false, true, false, 25, 3, 8, 0 };
 		imdb_class_create(hmdb, &cdef, &hcls);
 	}
 	void TearDown()
@@ -102,8 +103,8 @@ protected:
 		obj_size_div = 64;
 
 		imdb_def_t db_def = { (block_size_t) (block_size - 1), BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
-		imdb_class_def_t	cdef = { "testobj", true, true, false, 25, 1, 0, 8, 0 };
+		imdb_init(&db_def, &hmdb);
+		imdb_class_def_t	cdef = { "testobj", true, true, false, 25, 1, 4, 0 };
 		imdb_class_create(hmdb, &cdef, &hcls);
 	}
 	void TearDown()
@@ -137,17 +138,17 @@ protected:
 		alloc_count = 1000;
  
 		imdb_def_t db_def = { block_size, BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
+		imdb_init(&db_def, &hmdb);
 		{
-			imdb_class_def_t	cdef = { "testobj32", false, false, false, 25, 10000, 0, 64, 32 };
+			imdb_class_def_t	cdef = { "testobj32", false, false, false, 25, 10000, 64, 32 };
 			imdb_class_create(hmdb, &cdef, &hcls_32);
 		}
 		{
-			imdb_class_def_t	cdef = { "testobj64", false, false, false, 25, 10000, 0, 64, 64 };
+			imdb_class_def_t	cdef = { "testobj64", false, false, false, 25, 10000, 64, 64 };
 			imdb_class_create(hmdb, &cdef, &hcls_64);
 		}
 		{
-			imdb_class_def_t	cdef = { "testobj256", false, false, false, 25, 10000, 0, 64, 256 };
+			imdb_class_def_t	cdef = { "testobj256", false, false, false, 25, 10000, 64, 256 };
 			imdb_class_create(hmdb, &cdef, &hcls_256);
 		}
 	}
@@ -171,26 +172,27 @@ protected:
 		block_size = 8192;
 		obj_size_div = 64;
 
-		imdb_def_t db_def = { block_size, BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
+		log_severity = log_severity_get ();
+        	log_severity_set (LOG_DEBUG);
 
 		imdb_def_t db_def2 = { block_size, BLOCK_CRC_WRITE, true, 4, 256 };
-		imdb_init(&db_def2, hmdb, &hfdb);
+		imdb_init(&db_def2, &hfdb);
 
-		imdb_class_def_t	cdef = { "testobj", false, true, false, 25, 3, 0, 8, 0 };
+		imdb_class_def_t	cdef = { "testobj", false, true, false, 25, 3, 4, 0 };
 		ASSERT_EQ(imdb_class_create(hfdb, &cdef, &hcls), IMDB_ERR_SUCCESS);
 	}
 	void TearDown()
 	{
-		imdb_done(hmdb);
+		imdb_done(hfdb);
+        	log_severity_set (log_severity);
 	}
 
-	imdb_hndlr_t	hmdb;
 	imdb_hndlr_t	hfdb;
 	imdb_hndlr_t	hcls;
 	block_size_t	block_size;
 	uint32		alloc_count;
 	obj_size_t	obj_size_div;
+	log_severity_t  log_severity;
 };
 
 TEST_F(IMDBFixedClass, StorageParameters)
@@ -210,9 +212,9 @@ TEST_F(IMDBFixedClass, StorageParameters)
 
 	ASSERT_EQ(class_info.cdef.obj_size, obj_size);
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks);
+	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
 
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 1);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE);
 
@@ -241,7 +243,7 @@ TEST_F(IMDBFixedClass, InsertOne)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 1);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE - (obj_size+SLOT_TYPE2_SIZE));
 }
@@ -260,7 +262,7 @@ TEST_F(IMDBFixedClass, BlockFillAndAllocateNext)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 2);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_BLOCK_SIZE);
 }
@@ -270,7 +272,7 @@ TEST_F(IMDBFixedClass, PageFill)
 	void* ptr;
 
 	int i;
-	for (i = 0; i < 12; i++) {
+	for (i = 0; i < ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks; i++) {
 		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
@@ -289,7 +291,7 @@ TEST_F(IMDBFixedClass, PageFillAndAllocateNext)
 	void* ptr;
 
 	int i;
-	for (i = 0; i < 13; i++) {
+	for (i = 0; i < ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks + 1; i++) {
 		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
@@ -298,7 +300,7 @@ TEST_F(IMDBFixedClass, PageFillAndAllocateNext)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 2);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks + class_info.cdef.page_blocks);
+	ASSERT_EQ(class_info.blocks, 2*class_info.cdef.page_blocks);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_PAGE_SIZE - (obj_size + SLOT_TYPE2_SIZE));
@@ -309,25 +311,26 @@ TEST_F(IMDBFixedClass, PagesMaxFill)
 	void* ptr;
 
 	int i;
-	for (i = 0; i < 61; i++) {
+	uint8 max_objs = ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks*class_pages;
+	for (i = 0; i < max_objs + 1; i++) {
 		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
-		ASSERT_EQ(ret, ((i==60)? IMDB_ALLOC_PAGES_MAX : IMDB_ERR_SUCCESS) );
+		ASSERT_EQ(ret, ((i==max_objs)? IMDB_ALLOC_PAGES_MAX : IMDB_ERR_SUCCESS) );
 	}
 
 	imdb_info_t imdb_inf;
 	imdb_info(hmdb, &imdb_inf, NULL, 0);
 	ASSERT_EQ(imdb_inf.stat.block_recycle, 0);
-	ASSERT_EQ(imdb_inf.stat.slot_data, 60);
-	ASSERT_EQ(imdb_inf.stat.slot_split, 40);
+	ASSERT_EQ(imdb_inf.stat.slot_data, max_objs);
+	ASSERT_EQ(imdb_inf.stat.slot_split, 36);
 
 	imdb_class_info_t class_info;
 	imdb_class_info(hcls, &class_info);
 
-	ASSERT_EQ(imdb_inf.stat.block_alloc, class_info.blocks + IMDB_INIT_BLOCKS);
-	ASSERT_EQ(imdb_inf.stat.page_alloc, class_info.pages + IMDB_INIT_PAGES);
+	ASSERT_EQ(imdb_inf.stat.block_alloc, class_info.blocks);
+	ASSERT_EQ(imdb_inf.stat.page_alloc, class_info.pages);
 
-	ASSERT_EQ(class_info.pages, 3);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks + class_info.cdef.page_blocks*2);
+	ASSERT_EQ(class_info.pages, class_pages);
+	ASSERT_EQ(class_info.blocks, class_pages*class_info.cdef.page_blocks);
 	ASSERT_EQ(class_info.blocks_free, 0);
 	ASSERT_EQ(class_info.slots_free, 0);
 	ASSERT_EQ(class_info.slots_free_size, 0);
@@ -352,7 +355,7 @@ TEST_F(IMDBFixedClass, DeleteOneAndInsertAfter)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 2);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
 	ASSERT_EQ(class_info.slots_free, 2);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_BLOCK_SIZE + (obj_size+SLOT_TYPE2_SIZE) );
 
@@ -363,7 +366,7 @@ TEST_F(IMDBFixedClass, DeleteOneAndInsertAfter)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 2);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_BLOCK_SIZE);
 }
@@ -388,7 +391,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks);
+	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
 	ASSERT_EQ(class_info.blocks_free, 0);
 	ASSERT_EQ(class_info.slots_free, 1);
 	//ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_PAGE_SIZE - (obj_size + SLOT_TYPE2_SIZE));
@@ -427,9 +430,9 @@ TEST_F(IMDBVariableClass, StorageBasicsVariable)
 	ASSERT_EQ(class_info.cdef.obj_size, 0);
 //	ASSERT_EQ(class_info.cdef.block_size, block_size);
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks);
+	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
 
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 1);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE);
 
@@ -460,7 +463,7 @@ TEST_F(IMDBVariableClass, InsertOne)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks_free, class_info.cdef.init_blocks - 1);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE - (obj_size_div + SLOT_TYPE4_SIZE));
 }
@@ -486,11 +489,11 @@ TEST_F(IMDBVariableClass, Insert128)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 3);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks + class_info.cdef.page_blocks * 2);
-	ASSERT_EQ(class_info.blocks_free, 1);
-	ASSERT_EQ(class_info.slots_free, 18);
-	ASSERT_EQ(class_info.fl_skip_count, 76);
-	ASSERT_EQ(class_info.slots_free_size, 6692);
+	ASSERT_EQ(class_info.blocks, 3*class_info.cdef.page_blocks);
+	ASSERT_EQ(class_info.blocks_free, 5);
+	ASSERT_EQ(class_info.slots_free, 19);
+	ASSERT_EQ(class_info.fl_skip_count, 99);
+	ASSERT_EQ(class_info.slots_free_size, 6720);
 
 	imdb_hndlr_t hcur;
 	void* ptrs[32];
@@ -541,7 +544,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	imdb_class_info(hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
-	ASSERT_EQ(class_info.blocks, class_info.cdef.init_blocks);
+	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
 	ASSERT_EQ(class_info.blocks_free, 0);
 	ASSERT_EQ(class_info.slots_free, 1);
 	//ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_PAGE_SIZE - (obj_size + SLOT_TYPE2_SIZE));
@@ -608,7 +611,7 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 
 	imdb_errcode_t ret;
 	int i;
-	for (i = 0; i < 128; i++) {
+	for (i = 0; i < 4; i++) {
 		ret = imdb_clsobj_insert(hcls, &ptr, obj_size_div*(1 + i % 16));
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 		os_memcpy(ptr, &i, sizeof(i));

@@ -12,7 +12,7 @@ protected:
 	void SetUp()
 	{
 		imdb_def_t db_def = { 1024, BLOCK_CRC_NONE, false, 0, 0 };
-		imdb_init(&db_def, 0, &hmdb);
+		imdb_init(&db_def, &hmdb);
 	}
 	void TearDown()
 	{
