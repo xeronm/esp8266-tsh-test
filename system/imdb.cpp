@@ -12,11 +12,11 @@ extern "C" {
 #define ROWID_SIZE			4
 #define CURSOR_SIZE			40
 #else
-#define HEADER_CLASS_SIZE	144
+#define HEADER_CLASS_SIZE	128
 #define HEADER_PAGE_SIZE	56
-#define HEADER_BLOCK_SIZE	12
+#define HEADER_BLOCK_SIZE	24
 #define ROWID_SIZE		16
-#define CURSOR_SIZE		64
+#define CURSOR_SIZE		56
 #endif
 
 #define SLOT_TYPE2_SIZE		4
@@ -162,7 +162,7 @@ protected:
 	imdb_hndlr_t	hcls_64;
 	imdb_hndlr_t	hcls_256;
 	block_size_t	block_size;
-	uint32			alloc_count;
+	uint32		alloc_count;
 };
 
 class IMDBFileClass : public ::testing::Test {
@@ -175,7 +175,7 @@ protected:
 		log_severity = log_severity_get ();
         	log_severity_set (LOG_DEBUG);
 
-		imdb_def_t db_def2 = { block_size, BLOCK_CRC_WRITE, true, 4, 256 };
+		imdb_def_t db_def2 = { block_size, BLOCK_CRC_NONE, true, 2, 256 };
 		imdb_init(&db_def2, &hfdb);
 
 		imdb_class_def_t	cdef = { "testobj", false, true, false, 25, 3, 4, 0 };
@@ -207,7 +207,7 @@ TEST_F(IMDBFixedClass, StorageParameters)
 	ASSERT_EQ(imdb_inf.size_cursor, CURSOR_SIZE);
 
 	imdb_class_info_t class_info;
-	ret = imdb_class_info(hcls, &class_info);
+	ret = imdb_class_info(hmdb, hcls, &class_info);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	ASSERT_EQ(class_info.cdef.obj_size, obj_size);
@@ -222,7 +222,7 @@ TEST_F(IMDBFixedClass, StorageParameters)
 	void* ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
-	ret = imdb_class_query(hcls, PATH_NONE, &hcur);
+	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	ret = imdb_class_fetch(hcur, 10, &rcnt, ptrs);
@@ -236,11 +236,11 @@ TEST_F(IMDBFixedClass, StorageParameters)
 TEST_F(IMDBFixedClass, InsertOne)
 {
 	void* ptr;
-	imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+	imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
@@ -254,12 +254,12 @@ TEST_F(IMDBFixedClass, BlockFillAndAllocateNext)
 
 	int i;
 	for (i = 0; i < 3; i++) {
-		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
@@ -273,12 +273,12 @@ TEST_F(IMDBFixedClass, PageFill)
 
 	int i;
 	for (i = 0; i < ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks; i++) {
-		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, 0);
@@ -292,12 +292,12 @@ TEST_F(IMDBFixedClass, PageFillAndAllocateNext)
 
 	int i;
 	for (i = 0; i < ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks + 1; i++) {
-		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 2);
 	ASSERT_EQ(class_info.blocks, 2*class_info.cdef.page_blocks);
@@ -313,7 +313,7 @@ TEST_F(IMDBFixedClass, PagesMaxFill)
 	int i;
 	uint8 max_objs = ((block_size - HEADER_BLOCK_SIZE)/obj_size)*page_blocks*class_pages;
 	for (i = 0; i < max_objs + 1; i++) {
-		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		ASSERT_EQ(ret, ((i==max_objs)? IMDB_ALLOC_PAGES_MAX : IMDB_ERR_SUCCESS) );
 	}
 
@@ -324,7 +324,7 @@ TEST_F(IMDBFixedClass, PagesMaxFill)
 	ASSERT_EQ(imdb_inf.stat.slot_split, 36);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(imdb_inf.stat.block_alloc, class_info.blocks);
 	ASSERT_EQ(imdb_inf.stat.page_alloc, class_info.pages);
@@ -343,27 +343,27 @@ TEST_F(IMDBFixedClass, DeleteOneAndInsertAfter)
 	int i;
 	void* ptr4del;
 	for (i = 0; i < 3; i++) {
-		imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		if (i == 1) ptr4del = ptr;
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	}
 
-	imdb_errcode_t ret = imdb_clsobj_delete(hcls, ptr4del);
+	imdb_errcode_t ret = imdb_clsobj_delete(hmdb, hcls, ptr4del);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
 	ASSERT_EQ(class_info.slots_free, 2);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_BLOCK_SIZE + (obj_size+SLOT_TYPE2_SIZE) );
 
-	ret = imdb_clsobj_insert(hcls, &ptr, 0);
+	ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	ASSERT_EQ(ptr, ptr4del);
 
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 2);
@@ -378,7 +378,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 	imdb_errcode_t ret;
 	int i;
 	for (i = 0; i < 16; i++) {
-		ret = imdb_clsobj_insert(hcls, &ptr, 0);
+		ret = imdb_clsobj_insert(hmdb, hcls, &ptr, 0);
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 		os_memcpy(ptr, &i, sizeof(i));
 	}
@@ -388,7 +388,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 	ASSERT_EQ(imdb_inf.stat.block_recycle, 2);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
@@ -400,12 +400,12 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 	void* ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
-	ret = imdb_class_query(hcls, PATH_NONE, &hcur);
+	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	ret = imdb_class_fetch(hcur, 10, &rcnt, ptrs);
-	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	ASSERT_EQ(rcnt, 10);
+	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	int j;
 	for (i = 0; i < rcnt; i++) {
 		os_memcpy(&j, (void*)ptrs[i], sizeof(j));
@@ -423,7 +423,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 TEST_F(IMDBVariableClass, StorageBasicsVariable)
 {
 	imdb_class_info_t class_info;
-	imdb_errcode_t ret = imdb_class_info(hcls, &class_info);
+	imdb_errcode_t ret = imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
@@ -440,7 +440,7 @@ TEST_F(IMDBVariableClass, StorageBasicsVariable)
 	void* ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
-	ret = imdb_class_query(hcls, PATH_NONE, &hcur);
+	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	ret = imdb_class_fetch(hcur, 10, &rcnt, ptrs);
@@ -456,11 +456,11 @@ TEST_F(IMDBVariableClass, StorageBasicsVariable)
 TEST_F(IMDBVariableClass, InsertOne)
 {
 	void* ptr;
-	imdb_errcode_t ret = imdb_clsobj_insert(hcls, &ptr, obj_size_div - 1);
+	imdb_errcode_t ret = imdb_clsobj_insert(hmdb, hcls, &ptr, obj_size_div - 1);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
@@ -476,7 +476,7 @@ TEST_F(IMDBVariableClass, Insert128)
 	imdb_errcode_t ret;
 	int i;
 	for (i = 0; i < 128; i++) {
-		ret = imdb_clsobj_insert(hcls, &ptr, obj_size_div*(1 + i % 16));
+		ret = imdb_clsobj_insert(hmdb, hcls, &ptr, obj_size_div*(1 + i % 16));
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 		os_memcpy(ptr, &i, sizeof(i));
 	}
@@ -486,20 +486,20 @@ TEST_F(IMDBVariableClass, Insert128)
 	imdb_info(hmdb, &imdb_inf, &info_array[0], 10);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 3);
 	ASSERT_EQ(class_info.blocks, 3*class_info.cdef.page_blocks);
 	ASSERT_EQ(class_info.blocks_free, 5);
 	ASSERT_EQ(class_info.slots_free, 19);
 	ASSERT_EQ(class_info.fl_skip_count, 99);
-	ASSERT_EQ(class_info.slots_free_size, 6720);
+	ASSERT_EQ(class_info.slots_free_size, 6544);
 
 	imdb_hndlr_t hcur;
 	void* ptrs[32];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
-	ret = imdb_class_query(hcls, PATH_NONE, &hcur);
+	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	int cnt = 0;
@@ -531,7 +531,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	imdb_errcode_t ret;
 	int i;
 	for (i = 0; i < 40; i++) {
-		ret = imdb_clsobj_insert(hcls, &ptr, obj_size_div*(1 + i % 16));
+		ret = imdb_clsobj_insert(hmdb, hcls, &ptr, obj_size_div*(1 + i % 16));
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 		os_memcpy(ptr, &i, sizeof(i));
 	}
@@ -541,7 +541,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	ASSERT_EQ(imdb_inf.stat.block_recycle, 2);
 
 	imdb_class_info_t class_info;
-	imdb_class_info(hcls, &class_info);
+	imdb_class_info(hmdb, hcls, &class_info);
 
 	ASSERT_EQ(class_info.pages, 1);
 	ASSERT_EQ(class_info.blocks, class_info.cdef.page_blocks);
@@ -553,7 +553,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	void* ptrs[25];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
-	ret = imdb_class_query(hcls, PATH_NONE, &hcur);
+	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 
 	ret = imdb_class_fetch(hcur, 25, &rcnt, ptrs);
@@ -597,9 +597,9 @@ TEST_F(IMDBFixedPerfClass, PerfTest)
 
 	int i;
 	for (i = 0; i < alloc_count; i++) {
-		imdb_clsobj_insert(hcls_32, &ptr, 0);
-		imdb_clsobj_insert(hcls_256, &ptr, 0);
-		imdb_clsobj_insert(hcls_64, &ptr, 0);
+		imdb_clsobj_insert(hmdb, hcls_32, &ptr, 0);
+		imdb_clsobj_insert(hmdb, hcls_256, &ptr, 0);
+		imdb_clsobj_insert(hmdb, hcls_64, &ptr, 0);
 	}
 }
 #endif
@@ -611,8 +611,8 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 
 	imdb_errcode_t ret;
 	int i;
-	for (i = 0; i < 4; i++) {
-		ret = imdb_clsobj_insert(hcls, &ptr, obj_size_div*(1 + i % 16));
+	for (i = 0; i < 128; i++) {
+		ret = imdb_clsobj_insert(hfdb, hcls, &ptr, obj_size_div*(1 + i % 16));
 		ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 		os_memcpy(ptr, &i, sizeof(i));
 	}
