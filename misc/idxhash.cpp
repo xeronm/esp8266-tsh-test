@@ -8,7 +8,7 @@ class IdxHashNullTermKey : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		ih_errcode_t res = ih_init8(buf, 1024, 16, 0, 2, &hndlr);
+		ih_errcode_t res = ih_init8(buf, 1025, 16, 0, 2, &hndlr);
 	}
 	void TearDown()
 	{
@@ -22,7 +22,7 @@ class IdxHashFixedKey : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		ih_errcode_t res = ih_init8(buf, 640, 16, sizeof(void*), 2, &hndlr);
+		ih_errcode_t res = ih_init8(buf, 641, 16, sizeof(void*), 2, &hndlr);
 	}
 	void TearDown()
 	{
