@@ -16,7 +16,7 @@ extern "C" {
 #define HEADER_PAGE_SIZE	56
 #define HEADER_BLOCK_SIZE	24
 #define ROWID_SIZE		16
-#define CURSOR_SIZE		56
+#define CURSOR_SIZE		40
 #endif
 
 #define SLOT_TYPE2_SIZE		4
@@ -202,9 +202,9 @@ protected:
 };
 
 
-imdb_errcode_t forall_sum (void *ptr, void *data) {
+imdb_errcode_t forall_sum (imdb_fetch_obj_t *fobj, void *data) {
     uint32 * pdata = (uint32 *) data;
-    uint32 * pitem = (uint32 *) ptr;
+    uint32 * pitem = (uint32 *) fobj->dataptr;
     *pdata = *pdata + *pitem;
     return IMDB_ERR_SUCCESS;
 }
@@ -233,7 +233,7 @@ TEST_F(IMDBFixedClass, StorageParameters)
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE);
 
 	imdb_hndlr_t hcur;
-	void* ptrs[10];
+	imdb_fetch_obj_t ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
@@ -412,7 +412,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 
 	// query elements
 	imdb_hndlr_t hcur;
-	void* ptrs[10];
+	imdb_fetch_obj_t ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
@@ -423,7 +423,7 @@ TEST_F(IMDBFixedRecycleClass, PageFillAndRecycle)
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	int j;
 	for (i = 0; i < rcnt; i++) {
-		os_memcpy(&j, (void*)ptrs[i], sizeof(j));
+		os_memcpy(&j, ptrs[i].dataptr, sizeof(j));
 		ASSERT_EQ(15 - i, j);
 	}
 
@@ -457,7 +457,7 @@ TEST_F(IMDBVariableClass, StorageBasicsVariable)
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE);
 
 	imdb_hndlr_t hcur;
-	void* ptrs[10];
+	imdb_fetch_obj_t ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
@@ -517,7 +517,7 @@ TEST_F(IMDBVariableClass, Insert128)
 	ASSERT_EQ(class_info.slots_free_size, 6544);
 
 	imdb_hndlr_t hcur;
-	void* ptrs[32];
+	imdb_fetch_obj_t ptrs[32];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
@@ -534,7 +534,7 @@ TEST_F(IMDBVariableClass, Insert128)
 		ASSERT_EQ(rcnt, 32);
 		uint32 j;
 		for (i = 0; i < rcnt; i++) {
-			os_memcpy(&j, (void*)ptrs[i], sizeof(uint32));
+			os_memcpy(&j, ptrs[i].dataptr, sizeof(uint32));
 			sum_b += j;
 		}
 	}
@@ -575,7 +575,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 
 	// query elements
 	imdb_hndlr_t hcur;
-	void* ptrs[25];
+	imdb_fetch_obj_t ptrs[25];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hmdb, hcls, PATH_NONE, &hcur);
@@ -586,7 +586,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 	int j;
 	for (i = 0; i < rcnt; i++) {
-		os_memcpy(&j, (void*)ptrs[i], sizeof(j));
+		os_memcpy(&j, ptrs[i].dataptr, sizeof(j));
 		ASSERT_EQ(39 - i, j);
 	}
 
@@ -594,7 +594,7 @@ TEST_F(IMDBVariableRecycleClass, PageFillAndRecycle)
 	ASSERT_EQ(ret, IMDB_CURSOR_NO_DATA_FOUND);
 	ASSERT_EQ(rcnt, 1);
 	for (i = 0; i < rcnt; i++) {
-		os_memcpy(&j, (void*)ptrs[i], sizeof(j));
+		os_memcpy(&j, ptrs[i].dataptr, sizeof(j));
 		ASSERT_EQ(14 - i, j);
 	}
 
@@ -661,7 +661,7 @@ TEST_F(IMDBFileClass, BasicOperations)
         ASSERT_EQ(hcls, hcls2);
 
 	imdb_hndlr_t hcur;
-	void* ptrs[10];
+	imdb_fetch_obj_t ptrs[10];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hfdb, hcls2, PATH_NONE, &hcur);
@@ -675,7 +675,7 @@ TEST_F(IMDBFileClass, BasicOperations)
 
 		uint32 j = 0;
 		for (i = 0; i < rcnt; i++) {
-			os_memcpy(&j, (void*)ptrs[i], sizeof(uint32));
+			os_memcpy(&j, ptrs[i].dataptr, sizeof(uint32));
                         sum += j;
 		}
 	}
@@ -724,7 +724,7 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 
 
 	imdb_hndlr_t hcur;
-	void* ptrs[32];
+	imdb_fetch_obj_t ptrs[32];
 	os_memset(ptrs, 0, sizeof(ptrs));
 	uint16 rcnt;
 	ret = imdb_class_query(hfdb, hcls, PATH_NONE, &hcur);
@@ -738,7 +738,7 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 
 		uint32 j = 0;
 		for (i = 0; i < rcnt; i++) {
-			os_memcpy(&j, (void*)ptrs[i], sizeof(uint32));
+			os_memcpy(&j, ptrs[i].dataptr, sizeof(uint32));
                         sum_b += j;
 		}
 	}

@@ -79,13 +79,13 @@ TEST_F(SyslogClass, ServiceRunning)
 
 	imdb_errcode_t ret2;
 	uint16 rcnt;
-	void* ptrs[10];
+	imdb_fetch_obj_t ptrs[10];
 	ret2 = imdb_class_fetch(hcur, 10, &rcnt, ptrs); 
 	ASSERT_EQ(rcnt, 6);
 	ASSERT_EQ(ret2, IMDB_CURSOR_NO_DATA_FOUND);
 	int j;
 	for (i = 0; i < rcnt; i++) {
-		syslog_logrec_t* lrec = (syslog_logrec_t*)ptrs[i];
+		syslog_logrec_t* lrec = (syslog_logrec_t*)ptrs[i].dataptr;
 		os_printf("%d.%d: %s\n", lrec->rec_no, lrec->rec_ctime, (char *)&lrec->vardata);
 	}
 
