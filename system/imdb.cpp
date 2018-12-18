@@ -471,8 +471,6 @@ TEST_F(IMDBVariableClass, StorageBasicsVariable)
 	ASSERT_EQ(ret, IMDB_ERR_SUCCESS);
 }
 
-
-
 TEST_F(IMDBVariableClass, InsertOne)
 {
 	void* ptr;
@@ -486,6 +484,34 @@ TEST_F(IMDBVariableClass, InsertOne)
 	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
 	ASSERT_EQ(class_info.slots_free, 1);
 	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE - (obj_size_div + SLOT_TYPE4_SIZE));
+}
+
+TEST_F(IMDBVariableClass, CoalesceFreeSlot)
+{
+	void* ptr;
+
+	ASSERT_EQ (imdb_clsobj_insert(hmdb, hcls, &ptr, obj_size_div), IMDB_ERR_SUCCESS);
+	ASSERT_EQ (imdb_clsobj_delete(hmdb, hcls, ptr), IMDB_ERR_SUCCESS);
+
+	void* ptr2;
+	ASSERT_EQ (imdb_clsobj_insert(hmdb, hcls, &ptr2, obj_size_div*2), IMDB_ERR_SUCCESS);
+	ASSERT_EQ (imdb_clsobj_insert(hmdb, hcls, &ptr, obj_size_div*3), IMDB_ERR_SUCCESS);
+
+	ASSERT_EQ (imdb_clsobj_delete(hmdb, hcls, ptr2), IMDB_ERR_SUCCESS);
+	ASSERT_EQ (imdb_clsobj_delete(hmdb, hcls, ptr), IMDB_ERR_SUCCESS);
+
+
+	imdb_info_t imdb_inf;
+	imdb_info(hmdb, &imdb_inf, NULL, 0);
+	ASSERT_EQ(imdb_inf.stat.slot_coalesce, 3);
+
+	imdb_class_info_t class_info;
+	imdb_class_info(hmdb, hcls, &class_info);
+
+	ASSERT_EQ(class_info.pages, 1);
+	ASSERT_EQ(class_info.blocks_free, class_info.cdef.page_blocks - 1);
+	ASSERT_EQ(class_info.slots_free, 1);
+	ASSERT_EQ(class_info.slots_free_size, block_size - HEADER_CLASS_SIZE);
 }
 
 TEST_F(IMDBVariableClass, Insert128)
