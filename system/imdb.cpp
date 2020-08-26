@@ -172,10 +172,10 @@ protected:
 		block_size = 4096;
 		obj_size_div = 64;
 
-                fio_user_format(0);
+        fio_user_format(0);
 
 		log_severity = log_severity_get ();
-        	log_severity_set (LOG_INFO);
+        log_severity_set (LOG_INFO);
 
 		imdb_def_t db_def2 = { block_size, BLOCK_CRC_NONE, true, 3, 256 };
 		imdb_init(&db_def2, &hfdb);
@@ -185,16 +185,21 @@ protected:
 
 		imdb_class_def_t	cdef2 = { "testobj2", false, true, false, 25, 3, 8, 0 };
 		ASSERT_EQ(imdb_class_create(hfdb, &cdef2, &hcls2), IMDB_ERR_SUCCESS);
+
+		imdb_class_def_t	cdef3 = { "testobj3", false, true, false, 25, 3, 8, 0 };
+		ASSERT_EQ(imdb_class_create(hfdb, &cdef3, &hcls3), IMDB_ERR_SUCCESS);
 	}
+
 	void TearDown()
 	{
 		imdb_done(hfdb);
-        	log_severity_set (log_severity);
+        log_severity_set (log_severity);
 	}
 
 	imdb_hndlr_t	hfdb;
 	imdb_hndlr_t	hcls;
 	imdb_hndlr_t	hcls2;
+	imdb_hndlr_t	hcls3;
 	block_size_t	block_size;
 	uint32		alloc_count;
 	obj_size_t	obj_size_div;
@@ -660,7 +665,6 @@ TEST_F(IMDBFixedPerfClass, PerfTest)
 }
 #endif
 
-
 TEST_F(IMDBFileClass, BasicOperations)
 {
 	void* ptr;
@@ -709,6 +713,39 @@ TEST_F(IMDBFileClass, BasicOperations)
 	ASSERT_EQ(sum, 4);
 }
 
+TEST_F(IMDBFileClass, PersistanceTest)
+{
+	void* ptr;
+	imdb_errcode_t ret;
+	uint32 i;
+
+	ASSERT_EQ(imdb_clsobj_insert(hfdb, hcls, &ptr, sizeof(uint32)), IMDB_ERR_SUCCESS);
+	i = 1; os_memcpy(ptr, &i, sizeof(uint32));
+	ASSERT_EQ(imdb_clsobj_insert(hfdb, hcls2, &ptr, sizeof(uint32)), IMDB_ERR_SUCCESS);
+	i = 2; os_memcpy(ptr, &i, sizeof(uint32));
+	ASSERT_EQ(imdb_clsobj_insert(hfdb, hcls3, &ptr, sizeof(uint32)), IMDB_ERR_SUCCESS);
+	i = 3; os_memcpy(ptr, &i, sizeof(uint32));
+
+	imdb_done(hfdb);
+
+	imdb_def_t db_def2 = { block_size, BLOCK_CRC_NONE, true, 3, 256 };
+	imdb_init(&db_def2, &hfdb);
+
+	imdb_class_find (hfdb, "testobj", &(hcls));
+	imdb_class_find (hfdb, "testobj2", &(hcls2));
+	imdb_class_find (hfdb, "testobj3", &(hcls3));
+
+	ASSERT_TRUE(hcls);
+	ASSERT_TRUE(hcls2);
+	ASSERT_TRUE(hcls3);
+
+    imdb_info_t     _imdb_info;
+    imdb_class_info_t info_array[10];
+    imdb_errcode_t  imdb_res = imdb_info (hfdb, &_imdb_info, info_array, 10);
+
+	ASSERT_EQ(_imdb_info.class_count, 3);
+}
+
 TEST_F(IMDBFileClass, BufferCacheTest)
 {
 	void* ptr;
@@ -729,16 +766,16 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 	imdb_class_info_t info_array[10];
 	imdb_info(hfdb, &imdb_inf, &info_array[0], 10);
 
-        d_log_iprintf ("imdb", "stat block r/w: %u/%u, header r/w: %u/%u", imdb_inf.stat.block_read, imdb_inf.stat.block_write, imdb_inf.stat.header_read, imdb_inf.stat.header_write);
-	ASSERT_EQ(imdb_inf.stat.block_write, 29);
+    d_log_iprintf ("imdb", "stat block r/w: %u/%u, header r/w: %u/%u", imdb_inf.stat.block_read, imdb_inf.stat.block_write, imdb_inf.stat.header_read, imdb_inf.stat.header_write);
+	ASSERT_EQ(imdb_inf.stat.block_write, 30);
 	ASSERT_EQ(imdb_inf.stat.header_write, imdb_inf.stat.header_read);
-	ASSERT_EQ(imdb_inf.stat.header_write, 5);
+	ASSERT_EQ(imdb_inf.stat.header_write, 6);
 
 	imdb_class_info_t class_info;
 	imdb_class_info(hfdb, hcls, &class_info);
 
 	imdb_info(hfdb, &imdb_inf, &info_array[0], 10);
-        d_log_iprintf ("imdb", "stat block r/w: %u/%u, header r/w: %u/%u", imdb_inf.stat.block_read, imdb_inf.stat.block_write, imdb_inf.stat.header_read, imdb_inf.stat.header_write);
+    d_log_iprintf ("imdb", "stat block r/w: %u/%u, header r/w: %u/%u", imdb_inf.stat.block_read, imdb_inf.stat.block_write, imdb_inf.stat.header_read, imdb_inf.stat.header_write);
 
 	ASSERT_EQ(class_info.pages, 3);
 	ASSERT_EQ(class_info.blocks, 3*class_info.cdef.page_blocks);
@@ -746,7 +783,7 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 	ASSERT_EQ(class_info.slots_free, 19);
 	ASSERT_EQ(class_info.fl_skip_count, 21);
 	ASSERT_EQ(class_info.slots_free_size, 6544);
-	ASSERT_EQ(imdb_inf.stat.block_write, 29);
+	ASSERT_EQ(imdb_inf.stat.block_write, 30);
 
 
 	imdb_hndlr_t hcur;
@@ -773,9 +810,9 @@ TEST_F(IMDBFileClass, BufferCacheTest)
 
 	imdb_info(hfdb, &imdb_inf, &info_array[0], 10);
         d_log_iprintf ("imdb", "stat block r/w: %u/%u, header r/w: %u/%u", imdb_inf.stat.block_read, imdb_inf.stat.block_write, imdb_inf.stat.header_read, imdb_inf.stat.header_write);
-	ASSERT_EQ(imdb_inf.stat.block_write, 29);
+	ASSERT_EQ(imdb_inf.stat.block_write, 30);
 	ASSERT_EQ(imdb_inf.stat.header_write, imdb_inf.stat.header_read);
-	ASSERT_EQ(imdb_inf.stat.header_write, 5);
+	ASSERT_EQ(imdb_inf.stat.header_write, 6);
 
         sum_b = 0;
         ASSERT_EQ (imdb_class_forall (hfdb, hcls, &sum_b, forall_sum), IMDB_ERR_SUCCESS);
